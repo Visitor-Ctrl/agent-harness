@@ -1,0 +1,6 @@
+[messaging]
+url = "https://mailbox.example.com"
+mailbox = "host-a"
+# Bearer credential comes only from AGENT_MSG_TOKEN, normally via secret-run.
+# If Access Service Auth is enabled, supply CF_ACCESS_CLIENT_ID and
+# CF_ACCESS_CLIENT_SECRET in the approved consumer's environment as well.

@@ -1,0 +1,13 @@
+name = "agent-msg-bus"
+main = "worker.mjs"
+compatibility_date = "2026-11-01"
+workers_dev = false
+preview_urls = false
+# Add a reviewed custom-domain route and Access Service Auth policy before use.
+[[durable_objects.bindings]]
+name = "MAILBOXES"
+class_name = "Mailbox"
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Mailbox"]
+# CLIENTS_JSON is a Worker secret supplied from Vault by the approved deploy path.
