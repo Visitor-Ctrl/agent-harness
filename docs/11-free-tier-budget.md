@@ -29,7 +29,7 @@ Each confirmed value below was checked 2026-11-17 on its linked official page. L
 | [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) | Five Cron Triggers/account | One monitor trigger |
 | [KV](https://developers.cloudflare.com/kv/platform/limits/) | 100,000 reads/day; 1,000 writes/day; 1 GB | 672 heartbeat writes/day plus transitions; keep messaging out of KV |
 | [D1](https://developers.cloudflare.com/workers/platform/pricing/#d1) | 5 million rows read/day; 100,000 written/day; 5 GB total | Optional app data; scans consume row allowance |
-| [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) | Re-check exact current Free request/duration/storage allowance and SQLite eligibility | Messaging chapter coming; do not provision from an old estimate |
+| [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) | Re-check exact current Free request/duration/storage allowance and SQLite eligibility | See [messaging](09-agent-messaging.md); do not provision from an old estimate |
 | [Pages](https://developers.cloudflare.com/pages/platform/limits/) | 500 builds/month, one concurrent Free build | Small sites; Functions have Workers limits |
 | [R2 Standard](https://developers.cloudflare.com/r2/pricing/) | 10 GB-month, 1 million Class A and 10 million Class B operations/month; internet egress free | Optional independent copy; billing exposure above allowance; not required for baseline |
 | [Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/) | Re-check current commercial terms/limits | Two local connectors; no paid load balancer |

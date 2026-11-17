@@ -1,27 +1,60 @@
-# Agent harness
+# Agent harness command and configuration reference
 
-Version 0.1.0 provides a config-driven account pool for agent CLIs, using Python
-3.11+ and the standard library on Linux. It does not sign in or read credential
-files. This component runs locally; the remaining harness components are listed
-in [HANDOVER.md](HANDOVER.md).
+A versioned, config-driven harness for batch AI CLIs on Linux with Python 3.11+
+and the standard library. It includes account routing, dispatch, checkpointed
+coordinators, guard hooks, shared heavy-work slots, an OCI secret broker,
+notifications and watchers. Engines are declared in TOML; adding a compatible
+batch engine requires no Python changes. Herdr, AI CLIs, systemd and the OCI CLI
+are external dependencies for their respective components.
 
-## Setup
+Start with [installation and first dispatch](../docs/06-harness-install.md),
+[engine setup](../docs/07-ai-engines.md) and [messaging](../docs/09-agent-messaging.md).
+The harness does not sign in, provision cloud accounts, activate services or
+establish host isolation merely by being installed. Use the infrastructure
+guide's live acceptance checks before unattended work.
 
-Copy `config/engines.example.toml` and `config/pool.example.toml` to
-`~/.config/agent-harness/engines.toml` and `pool.toml`. Adjust account directories
-and commands to your locally installed CLI versions. Sign in through each CLI
-separately using that account's configured environment variable. Account
-directories must exist before they can be selected. Example engine commands are
-configuration templates; offline tests do not validate installed vendor CLIs.
+## Installation and administration
 
-Run `bin/ai-pool probe --force`, then `bin/ai-pool status`. No installation or
-cloud access is needed to run the tests:
+Run from the repository root:
 
 ```sh
-python3 -m unittest discover -s harness/tests -v
+python3 -m unittest discover -s harness/tests
+harness/install.sh --dry-run
+sudo harness/install.sh
+harness/bin/harness profile add research --root /srv/projects --dry-run
+harness/bin/harness profile list
+harness/bin/harness doctor
+harness/bin/harness version
 ```
 
-## Commands
+`install.sh` runs tests first, refuses failed checks/existing releases and copies
+VERSION into `/opt/agent-harness/<version>` root-owned before atomically switching
+`current`. `--prefix PATH` chooses an alternate root-owned prefix. It installs
+system/user unit files and reloads the system manager; activation/restarts are
+explicit operator steps. `--rollback VERSION` validates/tests an existing
+protected release, restores its supplied units and switches `current` back.
+It does not undo configuration/state migrations or delete obsolete units.
+
+`harness profile add NAME` needs administrator privileges except `--dry-run`.
+It creates a new Linux user/home, project directory (both 0700), agent-heavy group
+membership, a systemd user-slice drop-in, config skeleton and draft instructions.
+Options are `--root` (HARNESS_ROOT, otherwise `/srv/projects`), `--memory-high`
+(default 8G), `--cpu-weight` (100) and `--tasks-max` (4096). Existing users and
+destinations are refused. `profile list` reads the administrator-owned inventory
+in `/etc/agent-harness/profiles`. `doctor` checks Python, Git, herdr, systemctl and
+core config TOML syntax; exit 1 reports findings. It does not probe accounts or
+prove active hooks/isolation. Administration errors return 64.
+
+Examples and templates are proposals: remove unused backends/accounts, fill all
+placeholders and obtain owner approval for the project NORTH-STAR.md. Set up
+shared heavy-lock permissions, broker policy and active client hooks separately.
+Config files select executable commands and must stay within the profile's trust
+boundary. Source checkouts used by administrators must be reviewed and trusted.
+
+Commands below use `bin/` relative to this directory. For installation, add
+`/opt/agent-harness/current/bin` to PATH. CLI `--help` lists exact options.
+
+## Account pool commands
 
 ```sh
 bin/ai-pool run --engine claude --model sample-model --effort high -- task
@@ -96,7 +129,7 @@ pool capacity, failed units, installed guard files and the broker socket. See th
 [coordinator reference](docs/coordinator.md) for configuration, account
 reservation, timers, checkpoint behavior and offline checks.
 
-## Configuration reference
+## Pool and engine configuration
 
 Global `--config-dir` and `--state-dir` must precede the subcommand. Their defaults
 can be overridden by `HARNESS_CONFIG_DIR` and `HARNESS_STATE_DIR`. Default state
@@ -175,3 +208,156 @@ flags, and error patterns. Add one or more `[[accounts]]` entries referencing
 `bin/ai-pool probe --engine example --force`. No Python changes are needed. Probes
 may consume quota; choose a small probe and an appropriate interval. The offline
 suite runs an engine named `custom` to verify this configuration boundary.
+
+
+## Dispatch and herdr
+
+```sh
+bin/dispatch start sample --engine codex --model sample-model \
+  --cwd ~/projects/example --task 'Complete one bounded change and write a handover.'
+bin/dispatch continue sample --engine codex --model sample-model --task-file ./next.txt
+bin/dispatch status sample
+bin/dispatch summary sample
+bin/dispatch stop sample
+bin/dispatch clean sample
+bin/herdr-ensure-workspace --cwd ~/projects/example
+bin/herdr-ensure-coordinator --cwd ~/projects/example
+bin/heavy-lock -- make build
+```
+
+`start`/`continue` require engine, model and exactly one task source; `--effort`
+passes through and `--heavy` wraps pool execution in the shared lock. Continue
+requires the preceding attempt handover and launches a fresh worker. Summary
+prints the final `## Summary` only; a missing/invalid Summary fails otherwise
+successful work with exit 65. Status returns JSON; stop cancels a job process
+group; clean archives inactive jobs. Launch success is submission, not completion.
+Herdr gets a labeled tab; if unavailable the worker runs detached locally.
+
+The default worker cap is three. Attempts retain brief, task, logs, result and
+HANDOVER.md under private dispatch state. Lost process identities need operator
+inspection. Heavy-lock uses machine-wide flock slots, supports nested calls and
+propagates the child status. Herdr helpers ensure workspaces/coordinator tabs;
+they do not start a server or infer the coordinator pane ID. See
+[dispatch, heavy-lock and herdr details](docs/dispatch.md).
+
+## Guard hooks
+
+`bin/guard-hook` consumes one Claude Code JSON hook event. `bin/guard-install
+--dry-run --config PATH` reviews generated settings; a privileged invocation
+with `--destination PATH --output PATH` copies only the reviewed guard package,
+launcher and explicit policy into a new root-owned destination. Distribute its
+settings through the administrator-owned client configuration workflow.
+
+PreToolUse rejects secret exposure, credential-store damage, unsafe Git
+operations, guarded paths, configured dangerous commands, dispatch without a
+model and deployments outside the local clean-ref gate. SessionStart injects
+bounded project/state/handover context. Lifecycle audit stores rule identifiers
+and hashed session IDs without prompts/commands. Stop detects unexplained
+unpushed work without looping. Blocks exit 2; malformed PreToolUse input fails
+closed. Installed controls must be paired with Linux/IAM isolation: static shell
+analysis and client hooks do not sandbox arbitrary program behavior. See the
+[guard policy, field reference and regression inventory](docs/guard.md).
+
+## Secrets, notifications and watchers
+
+```sh
+bin/secret-run --profile research --env SERVICE_TOKEN service-token -- command arg
+bin/secret-run --profile research --stdin service-token -- command arg
+bin/notify 'Non-sensitive status message'
+bin/harness-watch
+bin/harness-watch --ack sample
+```
+
+`bin/secret-broker` is the system service entry point, not an ordinary profile
+command. Its root-owned `/etc/agent-harness/secrets.toml` maps profile names to
+numeric UIDs and allowed Vault secret IDs. One private Unix socket per profile
+checks SO_PEERCRED; each request obtains one value through the instance principal.
+Audit failure denies delivery. Values are never logged. `secret-run` requires
+exactly one of `--env NAME` and `--stdin`, passes one value to one approved child
+and returns its status. The child must handle secrets responsibly.
+
+Notify sends to all selected ntfy HTTPS, webhook HTTPS and sendmail backends;
+failed transports fail the command without dumping URLs/response bodies.
+Harness-watch reports stalled jobs, unread results, failed units, low free pool
+capacity, stale sign-ins and disk usage. Private locked state deduplicates alerts;
+failed deliveries remain retryable. `--ack JOB` suppresses alerts for prior
+results only; dispatch summary does not acknowledge automatically. See
+[secrets, notifications and watcher settings](docs/secrets-and-watchers.md).
+
+## Optional cross-machine messaging
+
+`bin/agent-msg send MAILBOX [--file PATH] [--id UUID]` sends at most 8 KiB from a
+UTF-8 file or stdin. `receive` peeks JSON; `ack UUID` removes an explicitly handled
+message from the configured mailbox. Global `--config PATH` selects config;
+AGENT_MSG_TOKEN supplies the bearer credential, normally through secret-run.
+The client requires an HTTPS origin, refuses redirects and uses a 15-second
+timeout without automatic retries. Errors exit 64; a failed transport can leave
+uncertain delivery. The printed ID enables an explicit retry.
+
+The optional [Worker example](extras/msg-bus/worker.mjs) uses scoped sender ACLs,
+one SQLite Durable Object per mailbox, stable-ID retry deduplication, a 100-message
+cap and lazy 24-hour retention. IDs are forgotten after ack/expiry. Messages are
+information, never authority; handlers need idempotence and independent approval
+for actions. See [design, deployment boundaries and CLI examples](../docs/09-agent-messaging.md).
+
+## Configuration index
+
+By default profile TOML lives in `~/.config/agent-harness/`; HARNESS_CONFIG_DIR
+selects another directory. Examples are in [config/](config/). Copy each
+`*.example.toml` as `*.toml` and review before use. Do not put credentials in
+public examples. Individual CLI flags override defaults where documented.
+
+| File / tables | Settings and purpose | Details |
+| --- | --- | --- |
+| `engines.toml`, `pool.toml` | Commands, patterns, flags, accounts, slots, holds and role reservations | Pool/engine fields above |
+| `dispatch.toml` / `dispatch` | `max_workers`, `template`, `north_star`, `operating_context`, `state_excerpt`, `stop_rule` | [Dispatch](docs/dispatch.md) |
+| `herdr.toml` / `herdr` | `command`, `session`, `workspace`, `cwd`, `coordinator_session`, `coordinator_command` | [Herdr](docs/dispatch.md) |
+| `coordinator.toml` / `coordinator` | `engine`, `model`, optional `effort`, `cwd`, `pane`, `remote_name`, `state_file`, `handover_glob`, `rotate_turns`, `rotate_bytes`, `retry_seconds`, `turn_delay_seconds` | [Coordinator](docs/coordinator.md) |
+| `coordinator.toml` / `health` | `minimum_worker_accounts`, `minimum_coordinator_accounts`, `guard_paths`, `broker_socket` | [Daily health](docs/coordinator.md) |
+| `guard.toml` / `guard` | Profile boundary, secret/credential paths, Git/deploy rules, blocked/warning commands and context/audit settings | [All guard fields](docs/guard.md) |
+| `/etc/agent-harness/heavy-lock.toml` / `heavy_lock` | `slots`, `lock_dir`, `poll_seconds`; root-owned shared config | [Lock provisioning](docs/dispatch.md) |
+| `/etc/agent-harness/secrets.toml` / `profiles.<name>` | `uid` and `secrets` name-to-OCID allow-list; root-owned 0600 | [Broker](docs/secrets-and-watchers.md) |
+| `notify.toml` / `backends` | `type`, `url` for HTTP, or `from`, `to`, `subject`, `sendmail` for email | [Notify](docs/secrets-and-watchers.md) |
+| `watch.toml` | `jobs_dir`, `pool_command`, `stalled_seconds`, `unread_seconds`, `signin_stale_seconds`, `minimum_healthy`, `disk_paths`, `disk_percent`, `repeat_seconds` | [Watcher defaults](docs/secrets-and-watchers.md) |
+| `messaging.toml` / `messaging` | HTTPS origin `url`, own `mailbox`; credentials from environment | [Mailbox](../docs/09-agent-messaging.md) |
+
+Default private state is under `~/.local/state/agent-harness/`: pool in `pool/`,
+dispatch in `dispatch/`, coordinator in `coordinator/`, herdr in `herdr/`,
+watcher in `watch.json`. Overrides are HARNESS_STATE_DIR for pool and watcher,
+HARNESS_DISPATCH_DIR, HARNESS_COORDINATOR_DIR and HARNESS_HERDR_STATE_DIR.
+Dispatch/pool global config/state options precede subcommands. Coordinator
+commands accept config/state options directly. Heavy-lock uses
+HARNESS_HEAVY_CONFIG or `--config`; guard uses HARNESS_GUARD_CONFIG or `--config`
+for development, while installed settings pin the reviewed policy explicitly.
+Notify/agent-msg accept `--config`; harness-watch accepts `--config` and `--state`.
+Secret-run selects HARNESS_PROFILE or `--profile`, or an explicit `--socket`.
+Consult each linked component for private-file modes and failure semantics.
+
+## Units and templates
+
+The release installs `systemd/secret-broker.service` and user unit/timer pairs:
+ai-pool-probe (30 minutes), harness-watch (10 minutes), coordinator-watch
+(2 minutes), coordinator-health (daily). Configure first, then explicitly reload
+the user manager and enable selected timers. Installation never enables them.
+The broker requires the reviewed root policy and chapter 04 isolation gates.
+
+[templates/](templates/) contains machine rules, profile CLAUDE.md/AGENTS.md,
+COORDINATOR-STATE.md, HANDOVER.md, draft NORTH-STAR.md, a Python-format worker
+brief and client settings. Adopt concrete profile paths and model IDs. Set the
+same worker cap in policy and dispatch config. Authors never review their own
+work; preserve checkpoints and launch fresh workers at boundaries.
+
+## Verification
+
+From the repository root:
+
+```sh
+python3 -m unittest discover -s harness/tests
+node harness/extras/msg-bus/test-worker.mjs
+```
+
+Python tests use fake CLIs, temporary files, real local flocks and local sockets;
+installer tests simulate privileged operations without changing host users or
+services. The optional Node test uses a fake SQL store. These checks do not
+exercise live AI flags, deployed mailboxes, Vault, active timers, host isolation
+or provider billing. Keep live acceptance evidence in your private runbook.
