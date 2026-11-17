@@ -6,8 +6,7 @@ Build a small, persistent workspace for coding agents: an ARM Linux host in Orac
 flowchart TB
   PC[PC or phone with SSH and cloudflared] --> A[Cloudflare Access: identity and MFA]
   A --> T[Cloudflare Tunnel: two outbound connectors]
-  T --> S[SSH gateway on micro VM]
-  S -->|ProxyJump over reverse SSH connection| B[A1 build VM: profiles, herdr, harness, CI]
+  T --> B[A1 build VM: loopback SSH, profiles, herdr, harness, CI]
   B -->|outbound| AI[AI providers]
   B -->|outbound| GH[GitHub repositories and job queue]
   B -->|broker only| V[OCI Vault]
@@ -18,7 +17,7 @@ flowchart TB
   W[Workers or Pages: public sites] --> DNS[Your domain]
 ```
 
-Both tunnel connectors run on the gateway micro VM in this baseline. This protects against a connector process failure; it does not survive gateway failure. The build VM opens a reverse SSH connection to the gateway, so all OCI security lists can have zero ingress. A second connector on the build VM cannot reach the gateway through the VCN without ingress exceptions; do not mistake it for a working failover design. A second gateway requires its own tested routing design.
+Both tunnel connectors run on the build VM in this baseline. This protects against a connector process failure; it does not survive VM failure. Both must reach the same origin. With zero OCI ingress, a connector on a micro VM cannot reach the build VM over the VCN. The micro VMs use their own tunnels if remote access is needed. Cross-host redundancy needs a separately reviewed routing design.
 
 Follow chapters in numerical order. Chapters 06 (harness installation), 07 (AI engines), and 09 (messaging) are coming separately. Until they exist and their checks pass, infrastructure setup alone does not provide safe agent execution or secret brokering. This guide writes configuration; it is not an automated cloud deployment.
 
