@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+printf '%s\n' 'Configure ci/check with project format, lint, type, import and test commands.' >&2
+exit 1

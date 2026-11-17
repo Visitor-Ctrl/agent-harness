@@ -1,0 +1,14 @@
+# Runtime state and credentials; examples must contain placeholders only.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+node_modules/
+.venv/
+__pycache__/
+.wrangler/
+coverage/
+dist/
+build/
