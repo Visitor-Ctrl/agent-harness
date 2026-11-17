@@ -15,6 +15,8 @@ sudo usermod -aG heavy profile-a
 sudo usermod -aG heavy profile-b
 sudo install -d -o profile-a -g profile-a -m 700 /home/profile-a/.ssh
 sudo install -d -o profile-b -g profile-b -m 700 /home/profile-b/.ssh
+sudo install -d -o profile-a -g profile-a -m 700 /srv/projects/profile-a
+sudo install -d -o profile-b -g profile-b -m 700 /srv/projects/profile-b
 ```
 
 Install each public key as that user's `.ssh/authorized_keys`, owned by the user, mode 600. Do not share private keys. Set `HARNESS_ROOT=/srv/projects` in each profile's own environment and create `${HARNESS_ROOT}/profile-a` and `profile-b`, owned by the corresponding user with mode 700. Add no profile to sudo, adm, disk or docker groups. Confirm `id profile-a`, `stat -c '%a %U' /home/profile-*`, and `sudo -u profile-a test ! -r /home/profile-b/.ssh/authorized_keys`.
@@ -45,15 +47,16 @@ Run `sudo systemctl daemon-reload`. Reconnect profiles at a maintenance boundary
 Use the official [Herdr TUI installation page](https://herdr.dev/tui/docs/install/). The TUI is suitable for SSH; the desktop/mobile app is a separate client and its command surface differs. As each profile (no sudo):
 
 ```sh
-curl -fsSL https://herdr.dev/install.sh -o /tmp/herdr-install.sh
-less /tmp/herdr-install.sh
-sh /tmp/herdr-install.sh
-rm /tmp/herdr-install.sh
+installer_dir=$(mktemp -d)
+curl -fsSL https://herdr.dev/install.sh -o "$installer_dir/install.sh"
+less "$installer_dir/install.sh"
+sh "$installer_dir/install.sh"
+rm -r "$installer_dir"
 herdr --version
 herdr --help
 ```
 
-Review the installer and its download sources before executing. Use a private temporary directory instead of `/tmp/herdr-install.sh` on an already shared host. Record the release version and architecture; check ARM64 support before installing on A1. Never run a profile's installer as root. Follow the installer's PATH instruction if `herdr` is not found.
+Review the installer and its download sources before executing. Record the release version and architecture; check ARM64 support before installing on A1. Never run a profile's installer as root. Follow the installer's PATH instruction if `herdr` is not found.
 
 ## 4. Start, detach and reattach
 
@@ -65,6 +68,8 @@ Before installing AI engines, run an ordinary shell command in a pane, disconnec
 
 From the PC use `ssh -l profile-a build`, then `herdr`. On a phone use an SSH terminal capable of executing the cloudflared ProxyCommand and opening the Access browser flow. Install both OpenSSH and cloudflared in that terminal environment, copy the chapter 03 host stanza, and enroll a separate passphrase-protected phone SSH key. Authenticate and verify the same host fingerprint before running herdr. Check the client platform supports these binaries before choosing it; a plain mobile SSH app cannot execute cloudflared by itself. The TUI supports narrow screens.
 
-If a phone cannot run cloudflared, use a trusted PC as the SSH transport (for example a remote terminal to that PC) or evaluate Cloudflare's browser-rendered SSH using its own documented authentication flow. Do not expose port 22 or publish an unauthenticated web terminal to make a phone client work. Review [Cloudflare SSH options](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/non-http/ssh/) for the chosen client.
+For Android, an explicit terminal option is Termux, whose [official package source](https://github.com/termux/termux-packages/blob/master/packages/cloudflared/build.sh) includes cloudflared. Install Termux from an official distribution, then run `pkg update`, `pkg install openssh cloudflared`, and `ssh-keygen -t ed25519` inside it. Install only the new public key on the server; copy the PC SSH stanza into the phone's `~/.ssh/config`, then run `ssh -l profile-a build` and open the displayed Access login link in the phone browser. Verify the fingerprint, then run `herdr`. Mobile package availability and battery/network interruptions need testing on your device.
+
+If a phone cannot run cloudflared, use a trusted PC as the SSH transport (for example a remote terminal to that PC) or evaluate Cloudflare's browser-rendered SSH using its own documented authentication flow. Do not expose port 22 or publish an unauthenticated web terminal to make a phone client work. Review [Cloudflare client SSH setup](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/use-cases/ssh/ssh-cloudflared-authentication/) for the chosen client.
 
 Exit check: attach from PC and phone, disconnect one and keep the session; confirm profile-b cannot inspect profile-a's files or herdr socket; inspect resource limits while a harmless task runs; verify no profile can sudo. Continue to chapter 06 only when that installation chapter is available.

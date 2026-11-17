@@ -6,7 +6,7 @@ OCI Vault is the source of truth for credentials. Do not add another general sec
 
 1. **Identity & Security → Vault → Create vault**, compartment `platform`. Choose the ordinary/default vault, not a virtual private vault. Create a symmetric AES key, **Protection mode: Software**. Review the cost display before creation. See [Vault concepts](https://docs.oracle.com/en-us/iaas/Content/KeyManagement/Concepts/keyoverview.htm).
 2. Under **Secrets → Create secret**, choose compartment `platform:profile-a`, this vault and the software key. Enter the credential through the secure Console input; name it by purpose, such as `source-read`. Repeat in `profile-b`. Create `tunnel-build` in `platform:compute` for chapter 03. Record only names and identifiers in the private inventory.
-3. Separate credential administration from consumption: human administrators can create/rotate; the VM can only read approved bundles. [Secret policy reference](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/secretpolicyreference.htm) describes the resource types and conditions. Keep identities, policy edits and Vault audit logs outside agent control.
+3. Separate credential administration from consumption: human administrators can create/rotate; the VM can only read approved bundles. [Secret policy reference](https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/keypolicyreference.htm) describes the resource types and conditions. Keep identities, policy edits and Vault audit logs outside agent control.
 
 ## 2. Bind only the intended instance
 

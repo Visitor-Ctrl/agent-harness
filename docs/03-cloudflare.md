@@ -75,7 +75,7 @@ Host build
   ServerAliveInterval 30
 ```
 
-Run `ssh build`. Complete browser login, verify the server host-key fingerprint through OCI Run Command (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`), then accept it. Access gates transport; sshd still checks your public key. After profiles exist, use `ssh -l profile-a build` with that profile's separately installed authorized key. See [SSH through cloudflared](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/non-http/ssh/).
+Run `ssh build`. Complete browser login, verify the server host-key fingerprint through OCI Run Command (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`), then accept it. Access gates transport; sshd still checks your public key. After profiles exist, use `ssh -l profile-a build` with that profile's separately installed authorized key. See [SSH through cloudflared](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/use-cases/ssh/ssh-cloudflared-authentication/).
 
 ## 6. Publish sites and protect forms
 

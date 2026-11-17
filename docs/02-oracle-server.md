@@ -84,7 +84,7 @@ printf '/swapfile none swap sw 0 0\n' | sudo tee -a /etc/fstab >/dev/null
 sudo apt-get install -y zram-tools
 ```
 
-Run once: recreating active swap is unsafe. For micros use 1 GB disk swap instead, after checking free disk. Set `/etc/default/zramswap` to `ALGO=lz4`, `PERCENT=25`, `PRIORITY=100`, one setting per line. Then `sudo systemctl restart zramswap`; inspect `swapon --show` and `zramctl`. zram consumes RAM and compressed swap is not extra guaranteed capacity. Configure profile pressure handling in chapter 05. Use `oomctl` and `journalctl -u systemd-oomd` to distinguish early pressure kills from kernel OOM.
+Run once: recreating active swap is unsafe. For micros use 1 GB disk swap instead, after checking free disk, and install `zram-tools` there too. Set `/etc/default/zramswap` to `ALGO=lz4`, `PERCENT=25`, `PRIORITY=100`, one setting per line. Then `sudo systemctl restart zramswap`; inspect `swapon --show` and `zramctl`. zram consumes RAM and compressed swap is not extra guaranteed capacity. Configure profile pressure handling in chapter 05. Use `oomctl` and `journalctl -u systemd-oomd` to distinguish early pressure kills from kernel OOM.
 
 Run `sudo dpkg-reconfigure -plow unattended-upgrades`, choose Yes; verify `apt-daily-upgrade.timer` is enabled and `sudo unattended-upgrade --dry-run` succeeds. Set an operator maintenance window for reboots; inspect `/var/run/reboot-required`. Never reboot during a build or backup.
 
