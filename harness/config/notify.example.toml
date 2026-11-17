@@ -1,0 +1,15 @@
+# Enable only wanted transports; keep URLs containing tokens private.
+[[backends]]
+type = "ntfy"
+url = "https://example.com/topic"
+
+[[backends]]
+type = "webhook"
+url = "https://example.com/webhook"
+
+[[backends]]
+type = "email"
+from = "harness@example.com"
+to = "operator@example.com"
+subject = "Agent harness alert"
+sendmail = "/usr/sbin/sendmail"

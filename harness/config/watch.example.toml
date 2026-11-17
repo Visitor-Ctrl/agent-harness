@@ -1,0 +1,9 @@
+jobs_dir = "~/.local/state/agent-harness/dispatch"
+pool_command = ["/opt/agent-harness/current/bin/ai-pool"]
+stalled_seconds = 3600
+unread_seconds = 3600
+signin_stale_seconds = 86400
+minimum_healthy = 2
+disk_paths = ["~"]
+disk_percent = 90
+repeat_seconds = 86400

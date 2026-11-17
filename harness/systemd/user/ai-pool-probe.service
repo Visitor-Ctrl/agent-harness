@@ -1,0 +1,7 @@
+[Unit]
+Description=Probe configured agent pool accounts
+
+[Service]
+Type=oneshot
+ExecStart=/opt/agent-harness/current/bin/ai-pool probe
+UMask=0077
