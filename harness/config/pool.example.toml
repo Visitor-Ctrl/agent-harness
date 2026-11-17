@@ -1,0 +1,34 @@
+[pool]
+cool_seconds = 3600
+probe_interval = 1800
+unlicensed_recheck = 1500
+probe_timeout = 90
+slot_wait = 0
+
+# Account names are unique within each engine. Directories must already exist;
+# the harness never creates credentials or signs in for you.
+[[accounts]]
+name = "acct-a"
+engine = "claude"
+config_dir = "~/.local/share/agent-harness/accounts/claude/acct-a"
+priority = 0
+slots = 2
+
+[[accounts]]
+name = "acct-b"
+engine = "claude"
+config_dir = "~/.local/share/agent-harness/accounts/claude/acct-b"
+priority = 10
+slots = 1
+
+[[accounts]]
+name = "acct-a"
+engine = "codex"
+config_dir = "~/.local/share/agent-harness/accounts/codex/acct-a"
+slots = 1
+
+[[accounts]]
+name = "acct-a"
+engine = "gemini"
+config_dir = "~/.local/share/agent-harness/accounts/gemini/acct-a"
+slots = 1

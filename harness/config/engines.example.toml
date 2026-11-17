@@ -1,0 +1,58 @@
+# Copy to ~/.config/agent-harness/engines.toml. Commands are argv, never shell.
+[engines.claude]
+command = ["claude", "-p"]
+config_env = "CLAUDE_CONFIG_DIR"
+model_flag = ["--model", "{model}"]
+effort_flag = ["--effort", "{effort}"]
+session_flag = ["--session-id", "{session}"]
+resume_flag = ["--resume", "{session}"]
+transcript_glob = "projects/*/{session}.jsonl"
+probe_command = ["claude", "-p", "Reply with OK", "--max-turns", "1"]
+# Optional line-JSON result schema; ordinary output is never parsed as events.
+stream_flags = [["--output-format", "stream-json"], ["--output-format=stream-json"]]
+[engines.claude.result]
+type_key = "type"
+type_value = "result"
+text_key = "result"
+error_key = "is_error"
+success_key = "subtype"
+success_value = "success"
+[engines.claude.patterns]
+limit = ['usage limit', 'hit your (usage )?limit', 'rate[ _-]?limit', 'too many requests']
+auth = ['not logged in', 'please run /login', 'invalid api key', 'oauth token .*expired', 'authentication_error']
+unlicensed = ['no seat', 'does not have access', 'subscription.*(expired|inactive)', 'credit balance']
+# Only anchored short notices can override exit zero; avoid matching quoted logs.
+notice_limit = ['^\W*(you.ve hit your|usage limit reached|rate limit exceeded)', '^\W*claude ai usage limit reached']
+notice_auth = ['^\W*not logged in', '^\W*please run /login']
+notice_unlicensed = ['^\W*no seat']
+
+[engines.codex]
+command = ["codex", "exec"]
+resume_command = ["codex", "exec", "resume"]
+config_env = "CODEX_HOME"
+model_flag = ["--model", "{model}"]
+effort_flag = ["-c", 'model_reasoning_effort="{effort}"']
+resume_flag = ["{session}"]
+transcript_glob = "sessions/**/*{session}.jsonl"
+probe_command = ["codex", "exec", "--skip-git-repo-check", "Reply with OK"]
+[engines.codex.patterns]
+limit = ['usage limit', 'out of credits', 'rate[ _-]?limit', 'too many requests']
+auth = ['not logged in', 'codex login', 'unauthorized', 'token.*expired']
+unlicensed = ['subscription.*expired', 'no access to model']
+notice_limit = ['^\W*you have run out of credits', '^\W*usage limit']
+notice_auth = ['^\W*not logged in']
+
+[engines.gemini]
+command = ["gemini"]
+config_env = "GEMINI_CLI_HOME"
+model_flag = ["--model", "{model}"]
+# No effort switch is declared: requesting one fails with a usage error.
+resume_flag = ["--resume", "{session}"]
+transcript_glob = ".gemini/tmp/**/chats/*{session}*.json"
+probe_command = ["gemini", "-p", "Reply with OK"]
+[engines.gemini.patterns]
+limit = ['quota.*exceeded', 'resource_exhausted', 'rate[ _-]?limit', 'too many requests']
+auth = ['authentication required', 'invalid_grant', 'not logged in']
+unlicensed = ['license.*required', 'subscription.*expired']
+notice_limit = ['^\W*quota.*exceeded', '^\W*resource_exhausted']
+notice_auth = ['^\W*authentication required']
