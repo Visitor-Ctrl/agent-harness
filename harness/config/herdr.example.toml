@@ -1,0 +1,8 @@
+[herdr]
+command = ["herdr"]
+session = "workers"
+workspace = "workers"
+cwd = "~/projects"
+coordinator_session = "coordinator"
+# Optional trusted argv, launched when the coordinator tab is first created.
+# coordinator_command = ["coordinator-launch"]
