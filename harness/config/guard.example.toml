@@ -28,3 +28,10 @@ require_model = true
 state_dir = "~/.local/state/agent-harness/guard"
 context_files = ["NORTH-STAR.md", "docs/north-star.md"]
 context_limit = 8000
+blocked_commands = [
+  "cryptsetup luksKillSlot*", "cryptsetup luksRemoveKey*", "cryptsetup luksErase*",
+  "wipefs *", "mkfs*", "dd *of=/dev/*", "visudo", "userdel *", "deluser *",
+  "ufw disable*", "nft flush ruleset*", "usermod *sudo*",
+  "sqlite3 *DELETE *", "sqlite3 *DROP *",
+]
+warning_commands = ["gh pr merge*"]

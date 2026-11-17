@@ -60,10 +60,10 @@ WRAPPERS = {
     'ionice': {'-c', '-n', '-p'}, 'timeout': {'-s', '-k'},
     'stdbuf': {'-i', '-o', '-e'}, 'nohup': set(), 'command': set(),
     'exec': {'-a'}, 'builtin': set(), 'heavy-lock': set(), 'setsid': set(),
-    'flock': {'-w', '-E'},
+    'flock': {'-w', '-E'}, 'busybox': set(),
 }
 ASSIGN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*=')
-SHELLS = {'bash', 'sh', 'dash', 'zsh', 'ksh'}
+SHELLS = {'bash', 'sh', 'dash', 'zsh', 'ksh', 'ash'}
 
 
 def _balanced(source, start):
@@ -199,6 +199,8 @@ def unwrap(command):
             args.pop(0)
             while args and str(args[0]).startswith('-'):
                 option = str(args.pop(0))
+                if name == 'env' and (option.startswith('-S') or option.startswith('--split-string')):
+                    raise ParseError('Use explicit env arguments instead of split-string programs')
                 if option == '--':
                     break
                 if option in WRAPPERS[name] and args:
@@ -259,6 +261,10 @@ def parse(source):
 def scripts(command):
     args = list(map(str, command.argv))
     if command.name in SHELLS:
+        if command.index:
+            raise ParseError('Piped shell programs require an explicit reviewed script')
+        if any(w.processes or w.substitutions for w in command.argv[1:]):
+            raise ParseError('Generated shell scripts are not statically inspectable')
         for index, arg in enumerate(args[1:], 1):
             if arg.startswith('-') and not arg.startswith('--') and 'c' in arg:
                 return args[index + 1:index + 2]

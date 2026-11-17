@@ -1,4 +1,5 @@
 """Configurable policy. Commands are parsed, never executed; Git queries are read-only."""
+import ast
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 import glob
@@ -49,6 +50,13 @@ class Policy:
     state_dir: str = '~/.local/state/agent-harness/guard'
     context_files: list = field(default_factory=lambda: ['NORTH-STAR.md', 'docs/north-star.md'])
     context_limit: int = 8000
+    blocked_commands: list = field(default_factory=lambda: [
+        'cryptsetup luksKillSlot*', 'cryptsetup luksRemoveKey*', 'cryptsetup luksErase*',
+        'wipefs *', 'mkfs*', 'dd *of=/dev/*', 'visudo', 'userdel *', 'deluser *',
+        'ufw disable*', 'nft flush ruleset*', 'usermod *sudo*',
+        'sqlite3 *DELETE *', 'sqlite3 *DROP *',
+    ])
+    warning_commands: list = field(default_factory=lambda: ['gh pr merge*'])
 
     @classmethod
     def load(cls, path=None):
@@ -150,7 +158,7 @@ def reveals(command):
             return True
         target = current.output()
         if target is not None:
-            return target in TERMINALS
+            return target in TERMINALS or target.startswith('>(')
         if current is not command:
             if current.name == 'tee' and any(str(arg) in TERMINALS for arg in current.argv[1:]):
                 return True
@@ -165,7 +173,7 @@ def reveals(command):
 
 def emits_secret(command, ctx, cwd):
     name, args = command.name, list(map(str, command.argv))
-    joined = ' '.join(args)
+    joined = ' '.join([name] + args[1:])
     if any(fnmatch(joined, pattern) for pattern in ctx.policy.secret_commands):
         return True
     if not args and 'env' in command.wrappers:
@@ -184,9 +192,12 @@ def emits_secret(command, ctx, cwd):
     if harmless(command):
         return False
     if name in ('python', 'python3', 'node', 'perl', 'ruby', 'php'):
-        if not any(arg in ('-c', '-e', '-') for arg in args[1:]):
+        bodies = [str(word) for op, word in command.redirects if op in ('<<', '<<-')]
+        if not bodies and not any(arg in ('-c', '-e', '-') for arg in args[1:]):
             return False
-        code = joined + '\n' + '\n'.join(str(word) for op, word in command.redirects if op in ('<<', '<<-'))
+        code = joined + '\n' + '\n'.join(bodies)
+        if re.search(r'environ|process\.env|ENV\[|getenv', code):
+            return True
         paths = re.findall(r'''["']([^"']+)["']''', code)
         return bool(re.search(r'print|stdout|console\.log|puts', code)) and any(secret_path(p, ctx, cwd) for p in paths)
     if name == 'cp':
@@ -212,6 +223,15 @@ def flatten(raw, ctx, depth=0, cwd=None, consumed=False):
     for pipeline in shparse.parse(raw):
         for command in pipeline:
             result.append((command, cwd, consumed))
+            if command.name == 'function':
+                raise shparse.ParseError('Use an explicit script for shell function definitions')
+            if command.name == 'xargs':
+                raise shparse.ParseError('Generated argument lists require explicit commands')
+            if command.name == 'find':
+                args = list(map(str, command.argv))
+                for marker in ('-exec', '-execdir', '-ok', '-okdir'):
+                    if marker in args:
+                        raise shparse.ParseError('Use explicit commands for find execution')
             for word in command.words + [w for _, w in command.redirects]:
                 leak = command.name in FILTERS | {'echo', 'printf'} and reveals(command)
                 for script in word.substitutions + word.processes:
@@ -240,6 +260,8 @@ def git_args(command, cwd, ctx):
             value = args.pop(0)
             if option == '-C':
                 cwd = expand(value, ctx, cwd)
+        elif option.startswith('-C'):
+            cwd = expand(option[2:], ctx, cwd)
         elif option.startswith('--work-tree='):
             cwd = expand(option.split('=', 1)[1], ctx, cwd)
     return args, cwd
@@ -248,7 +270,9 @@ def git_args(command, cwd, ctx):
 def check_git(command, cwd, ctx):
     args, cwd = git_args(command, cwd, ctx)
     raw = ' '.join(map(str, command.argv))
-    if 'core.hooksPath' in raw or '--no-verify' in args or (args and args[0] == 'commit' and any(re.fullmatch(r'-[a-zA-Z]*n[a-zA-Z]*', arg) for arg in args[1:] if arg.startswith('-'))):
+    if any(key.startswith(('GIT_CONFIG', 'GIT_DIR', 'GIT_WORK_TREE')) for key in command.env) or re.search(r'alias\.|include\.|includeIf\.|--config-env', raw, re.I):
+        return [Finding('git-config', 'Use the repository Git configuration without command or environment overrides.')]
+    if re.search('core.hookspath', raw, re.I) or '--no-verify' in args or (args and args[0] == 'commit' and any(re.fullmatch(r'-[a-zA-Z]*n[a-zA-Z]*', arg) for arg in args[1:] if arg.startswith('-'))):
         return [Finding('git-hooks', 'Keep repository hooks enabled.')]
     if not args:
         return []
@@ -265,7 +289,7 @@ def check_git(command, cwd, ctx):
     if sub == 'clean' and any('f' in arg for arg in tail if arg.startswith('-')):
         return [Finding('git-destructive', 'Review and remove explicit paths instead of git clean.')]
     if sub == 'push' and '--dry-run' not in tail and '-n' not in tail:
-        if any(arg in ('--force', '-f', '--all', '--mirror') or arg.startswith('--force=') or arg.startswith('+') or '*' in arg for arg in tail):
+        if any(arg in ('--force', '-f', '--all', '--mirror') or re.fullmatch(r'-[a-zA-Z]*f[a-zA-Z]*', arg) or arg.startswith('--force=') or arg.startswith('+') or '*' in arg for arg in tail):
             return [Finding('git-force', 'Use a normal feature branch push.')]
         if '--delete' in tail or '-d' in tail:
             return [Finding('git-delete', 'Review branch deletion before proceeding.', 'warn')]
@@ -320,13 +344,72 @@ def write_targets(command):
 def sandboxed(command, ctx, names):
     """Explicit throwaway directories may isolate authentication cleanup tests."""
     temporary = Path(tempfile.gettempdir()).resolve()
-    for name in names:
-        value = command.env.get(name, '')
+    # Every supplied override must be temporary; one safe value cannot mask a
+    # second persistent credential directory.
+    supplied = [command.env[name] for name in names if command.env.get(name)]
+    if not supplied:
+        return False
+    for value in supplied:
         if value and os.path.isabs(value):
             candidate = Path(value).resolve()
             if candidate != temporary and candidate.is_relative_to(temporary) and candidate.is_dir() and not matches(str(candidate), ctx.policy.credential_paths, ctx):
-                return True
-    return False
+                continue
+        return False
+    return True
+
+
+def inspect_inline(command, ctx, cwd):
+    """Inspect Python literal paths; reject opaque inline program execution.
+
+    This intentionally does not attempt to prove arbitrary program semantics.
+    Dynamic execution and computed file names should live in reviewed scripts.
+    """
+    args = list(map(str, command.argv[1:]))
+    bodies = [str(w) for op, w in command.redirects if op in ('<<', '<<-')]
+    for flag in ('-c', '-e'):
+        if flag in args and args.index(flag) + 1 < len(args):
+            bodies.append(args[args.index(flag) + 1])
+    if command.name not in ('python', 'python3', 'node', 'ruby', 'perl', 'php') or not bodies:
+        return []
+    code = '\n'.join(bodies)
+    if re.search(r'\b(?:exec|eval|compile|system|popen|Popen|spawn|subprocess|atob|fromhex|b64decode)\b', code):
+        return [Finding('inline-dynamic', 'Use a reviewed script for dynamic interpreter execution.')]
+    if command.name not in ('python', 'python3'):
+        return []
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return [Finding('inline-dynamic', 'Use a parseable literal inline program or a reviewed script.')]
+
+    def literal(node):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            return literal(node.left) + literal(node.right)
+        raise ValueError
+
+    findings = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, 'attr', '')
+        if name not in ('open', 'Path', 'read_text', 'read_bytes', 'write_text', 'write_bytes', 'unlink', 'remove', 'rmtree', 'rename'):
+            continue
+        if not node.args:
+            continue
+        try:
+            path = literal(node.args[0])
+        except ValueError:
+            findings.append(Finding('inline-dynamic', 'Use literal paths in inline programs or a reviewed script.'))
+            continue
+        if secret_path(path, ctx, cwd) and reveals(command):
+            findings.append(Finding('secrets', 'Use secret files by reference; inspect names or counts only.'))
+        if any(matches(path, patterns, ctx, cwd) for patterns in (ctx.policy.guard_paths, ctx.policy.guarded_paths, ctx.policy.credential_paths)) and name != 'Path':
+            # Existing literal read-only inspection remains supported.
+            writing = name in ('write_text', 'write_bytes', 'unlink', 'remove', 'rmtree', 'rename') or (name == 'open' and len(node.args) > 1 and isinstance(node.args[1], ast.Constant) and re.search('[wax+]', str(node.args[1].value)))
+            if writing:
+                findings.append(Finding('guarded-path', 'Inline programs cannot change owner-managed paths.'))
+    return findings
 
 
 def evaluate_bash(raw, ctx):
@@ -344,7 +427,12 @@ def evaluate_bash(raw, ctx):
     runner = any(c.name not in set(ctx.policy.credential_readers) | {'git', 'sed', 'cd'} or c.writes() for c, _, _ in commands)
     for command, cwd, consumed in commands:
         args = list(map(str, command.argv))
-        joined = ' '.join(args)
+        joined = ' '.join([command.name] + args[1:])
+        if any(fnmatch(joined, pattern) for pattern in ctx.policy.blocked_commands):
+            findings.append(Finding('blocked-command', 'This operation requires an approved administrative workflow.'))
+        if any(fnmatch(joined, pattern) for pattern in ctx.policy.warning_commands):
+            findings.append(Finding('review-command', 'Review this operation before proceeding.', 'warn'))
+        findings.extend(inspect_inline(command, ctx, cwd))
         if command.name and ('$' in command.name or '`' in command.name):
             findings.append(Finding('shell-dynamic', 'Use a literal command name so the guard can inspect it.'))
         if emits_secret(command, ctx, cwd) and reveals(command) and not (consumed and command.index == len(command.pipeline) - 1 and command.output() is None):
