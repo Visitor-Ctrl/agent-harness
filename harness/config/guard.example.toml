@@ -1,0 +1,30 @@
+# Root-owned installed policy. Arrays replace defaults; omitted keys retain them.
+[guard]
+profile = "example"
+root = "/srv/projects/example"
+guarded_paths = ["/etc/sudoers", "/etc/sudoers.d", "${HARNESS_ROOT}/owner-managed"]
+guard_paths = ["/opt/agent-harness", "~/.config/agent-harness/guard.toml", "~/.claude/settings*.json", ".claude/settings*.json", "~/.claude-accounts/*/settings*.json"]
+denied_paths = [] # Add sibling profile roots here if required.
+secret_patterns = [
+  '/(?:\.env(?:\.[^/]*)?|\.dev\.vars)$', '/\.credentials\.json$',
+  '/\.codex/auth\.json$', '/\.git-credentials$', '/\.netrc$',
+  '/\.ssh/id_[^/]+(?<!\.pub)$', '\.(?:pem|key|p12|pfx)$',
+  '/\.oci/[^/]+$', '/\.docker/config\.json$', '/run/secrets/',
+  '/(?:oauth_creds|google_accounts|msal_token_cache)\.json$',
+  '/\.config/gh/hosts\.yml$',
+]
+secret_exemptions = ["*.example", "*.sample", "*.template", "*.pub"]
+credential_paths = ["~/.config/gh", "~/.codex", "~/.ssh", "~/.claude", "~/.claude-accounts", "~/.oci"]
+credential_readers = ["cat", "less", "more", "head", "tail", "grep", "rg", "wc", "diff", "file", "stat", "ls", "sha256sum", "md5sum"]
+credential_scripts = ["*signout*.sh", "*sign-out*.sh", "*ceremony-close*.sh"]
+credential_logout_commands = ["gh auth logout"]
+credential_sandbox_env = ["HOME", "GH_CONFIG_DIR"]
+secret_commands = ["gh auth token*", "gh auth status *--show-token*", "oci secrets secret-bundle get*", "git credential fill*", "gcloud auth print-*-token*", "pass show*", "vault kv get*"]
+protected_branches = ["main", "master"]
+deploy_commands = ["wrangler *deploy*", "wrangler secret put*", "wrangler d1 migrations apply *--remote*", "npm run deploy*", "./scripts/deploy*"]
+deploy_ref = "origin/main"
+require_deploy_ref = true
+require_model = true
+state_dir = "~/.local/state/agent-harness/guard"
+context_files = ["NORTH-STAR.md", "docs/north-star.md"]
+context_limit = 8000

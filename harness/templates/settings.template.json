@@ -1,0 +1,102 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/agent-harness/guard/bin/guard-hook --config /opt/agent-harness/guard/config/guard.toml",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/agent-harness/guard/bin/guard-hook --config /opt/agent-harness/guard/config/guard.toml",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/agent-harness/guard/bin/guard-hook --config /opt/agent-harness/guard/config/guard.toml",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/agent-harness/guard/bin/guard-hook --config /opt/agent-harness/guard/config/guard.toml",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/agent-harness/guard/bin/guard-hook --config /opt/agent-harness/guard/config/guard.toml",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/agent-harness/guard/bin/guard-hook --config /opt/agent-harness/guard/config/guard.toml",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/agent-harness/guard/bin/guard-hook --config /opt/agent-harness/guard/config/guard.toml",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "deny": [
+      "Edit(**/.claude/settings*.json)",
+      "Edit(/opt/agent-harness/**)",
+      "Read(**/.codex/auth.json)",
+      "Read(**/.credentials.json)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/.ssh/id_*)",
+      "Write(**/.claude/settings*.json)",
+      "Write(/opt/agent-harness/**)"
+    ]
+  }
+}
