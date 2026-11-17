@@ -1,0 +1,5 @@
+[heavy_lock]
+slots = 2
+# Provision this shared directory and its files for the intended Unix group.
+lock_dir = "/run/lock/agent-harness"
+poll_seconds = 0.2
