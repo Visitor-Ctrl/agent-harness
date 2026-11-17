@@ -87,6 +87,15 @@ written atomically to the specified existing parent directory. This variable is
 removed from the child's environment. The retry timestamp is a hint: disabled,
 signed-out, and missing-directory accounts need intervention.
 
+## Coordinator commands
+
+`bin/coordinator` supervises bounded turns in one existing herdr pane;
+`bin/coordinator-watch` detects configured limit notices; `bin/coordinator-rotate`
+queues a fresh session at a checkpoint boundary; `bin/coordinator-health` reports
+pool capacity, failed units, installed guard files and the broker socket. See the
+[coordinator reference](docs/coordinator.md) for configuration, account
+reservation, timers, checkpoint behavior and offline checks.
+
 ## Configuration reference
 
 Global `--config-dir` and `--state-dir` must precede the subcommand. Their defaults
@@ -114,7 +123,10 @@ positive. A limit notice containing `retry in N seconds/minutes/hours` or a futu
 `|<epoch>` overrides the default cooldown. Other reset formats use the default.
 
 Each account requires `name`, `engine`, and `config_dir`. Optional `priority`
-defaults to 0 and `slots` defaults to 1 (integer, 1–1024). Names are lowercase
+defaults to 0 and `slots` defaults to 1 (integer, 1–1024). `reserved_for` optionally
+names a scheduling role: ordinary `run` and `healthy` use role `worker` and
+exclude other roles' reservations; `--role coordinator` includes shared and
+coordinator-reserved accounts. Status/probes cover every account. Names are lowercase
 letters, digits, and hyphens. Account names are unique within an engine. Paths
 expand `~`; variables such as `$HOME` are not expanded. Account config roots may
 contain engine-specific subdirectories; for Gemini, `GEMINI_CLI_HOME` selects a

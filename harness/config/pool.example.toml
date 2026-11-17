@@ -32,3 +32,12 @@ name = "acct-a"
 engine = "gemini"
 config_dir = "~/.local/share/agent-harness/accounts/gemini/acct-a"
 slots = 1
+
+# Ordinary runs and worker healthy counts exclude reserved accounts.
+# The coordinator prefers its reserved account, then falls back to shared ones.
+[[accounts]]
+name = "acct-coordinator"
+engine = "claude"
+config_dir = "~/.local/share/agent-harness/accounts/claude/acct-coordinator"
+reserved_for = "coordinator"
+slots = 1

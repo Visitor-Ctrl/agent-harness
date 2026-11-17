@@ -1,0 +1,7 @@
+[Unit]
+Description=Inspect coordinator pane for usage limits
+
+[Service]
+Type=oneshot
+ExecStart=/opt/agent-harness/current/bin/coordinator-watch
+UMask=0077

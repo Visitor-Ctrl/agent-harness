@@ -93,6 +93,9 @@ class Pool:
                 raise ValueError("slots must be an integer between 1 and 1024")
             if type(account.get("priority", 0)) is not int:
                 raise ValueError("priority must be an integer")
+            reserved = account.get("reserved_for", "")
+            if not isinstance(reserved, str) or (reserved and not NAME.fullmatch(reserved)):
+                raise ValueError("reserved_for must be a role name")
             account["path"] = Path(account["config_dir"]).expanduser().absolute()
         self.root = state
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -371,7 +374,8 @@ def transfer_session(pool, accounts, target, session):
 
 def run(pool, args):
     engine = pool.engines[args.engine]
-    accounts = pool.selected(args.engine, args.account)
+    accounts = [a for a in pool.selected(args.engine, args.account)
+                if not a.get("reserved_for") or a["reserved_for"] == getattr(args, "role", "worker")]
     if args.session and not SESSION.fullmatch(args.session):
         raise ValueError("invalid session identifier")
     if args.resume and not SESSION.fullmatch(args.resume):
@@ -478,6 +482,7 @@ def parser():
         sub.add_argument("--engine", required=cmd not in ("status", "healthy", "probe"))
         if cmd == "run":
             sub.add_argument("--account")
+            sub.add_argument("--role", default="worker")
             sub.add_argument("--model")
             sub.add_argument("--effort")
             sessions = sub.add_mutually_exclusive_group()
@@ -492,6 +497,7 @@ def parser():
             sub.add_argument("--account")
             sub.add_argument("--force", action="store_true")
         elif cmd == "healthy":
+            sub.add_argument("--role", default="worker")
             sub.add_argument("--names", action="store_true")
         else:
             sub.add_argument("--json", action="store_true")
@@ -532,13 +538,15 @@ def main(argv=None):
             for account in accounts:
                 record = state.get(account["key"], {})
                 rows.append(dict(engine=account["engine"], name=account["name"],
+                                 reserved_for=account.get("reserved_for", ""),
                                  state=pool.effective(record), manual=record.get("manual", ""),
                                  busy=pool.busy(account), slots=account["slots"],
                                  configured=account["path"].is_dir(), checked=record.get("checked"),
                                  until=record.get("until"), uncertain=record.get("uncertain", False)))
         if args.command == "healthy":
             # Unknown and inconclusive results are never counted as verified healthy.
-            rows = [r for r in rows if r["state"] == "ok" and not r["manual"] and not r["uncertain"]
+            rows = [r for r in rows if (not r["reserved_for"] or r["reserved_for"] == args.role)
+                    and r["state"] == "ok" and not r["manual"] and not r["uncertain"]
                     and r["configured"] and r["busy"] < r["slots"]]
             output = "\n".join(f"{r['engine']}/{r['name']}" for r in rows) if args.names else str(len(rows))
         elif args.json:

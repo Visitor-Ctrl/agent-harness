@@ -1,0 +1,20 @@
+[coordinator]
+engine = "claude"
+model = "sample-model" # Replace with a model supported by the selected CLI.
+cwd = "~/projects/example"
+pane = "replace-with-existing-pane-id"
+remote_name = "coordinator" # Stable herdr --session name; never changed by rotation.
+state_file = "COORDINATOR-STATE.md"
+handover_glob = "*HANDOVER*.md"
+rotate_turns = 20 # Zero disables this threshold.
+rotate_bytes = 1000000 # Combined stdout/stderr bytes since last rotation.
+retry_seconds = 60
+turn_delay_seconds = 30
+# effort = "high"
+
+[health]
+minimum_worker_accounts = 2
+minimum_coordinator_accounts = 1
+# These must name the root-owned installation and installed policy.
+guard_paths = ["/opt/agent-harness/current/bin/guard-hook", "/etc/agent-harness/guard.toml"]
+broker_socket = "/run/agent-harness/example.sock"
