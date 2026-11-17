@@ -1,0 +1,27 @@
+# Credentials and local runtime state (tracked examples must be synthetic).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+*.secret
+*.log
+.oci/
+.ssh/
+.wrangler/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.example.tfvars
+.dispatch/
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+coverage/
+dist/
+build/
+.DS_Store
