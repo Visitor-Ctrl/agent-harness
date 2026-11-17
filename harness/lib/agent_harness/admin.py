@@ -189,7 +189,7 @@ def add_profile(args):
         os.chown(path, account.pw_uid, account.pw_gid)
     dropin = SYSTEM / f'user-{account.pw_uid}.slice.d'
     trusted(dropin)
-    dropin.mkdir(mode=0o755)
+    dropin.mkdir(parents=True, mode=0o755)
     atomic_text(dropin / '50-agent-harness.conf',
                 f'[Slice]\nMemoryHigh={args.memory_high}\nCPUWeight={args.cpu_weight}\nTasksMax={args.tasks_max}\n', 0o644)
     registry.parent.mkdir(parents=True, exist_ok=True, mode=0o755)

@@ -92,6 +92,34 @@ class AdminTests(unittest.TestCase):
             self.assertEqual(self.invoke(['profile', 'add', 'sample', '--root', temporary, '--dry-run'])[0], 64)
         self.assertEqual(self.invoke(['profile', 'add', '../escape', '--dry-run'])[0], 64)
 
+    def test_profile_provisions_private_config_and_slice(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            homes, projects = base / 'homes', base / 'projects'
+            homes.mkdir()
+            account = type('Account', (), {'pw_uid': 12345, 'pw_gid': 12345})()
+            def command(argv, **kwargs):
+                if argv[0] == 'useradd':
+                    (homes / 'sample').mkdir()
+            with patch.multiple(admin, HOME_ROOT=homes, ETC=base / 'etc', SYSTEM=base / 'system'), \
+                    patch.object(admin, 'trusted'), patch.object(admin, 'root_required'), \
+                    patch.object(admin.os, 'chown'), \
+                    patch.object(admin.pwd, 'getpwnam', side_effect=[KeyError(), account]), \
+                    patch.object(admin.subprocess, 'run', side_effect=command) as run:
+                code, _ = self.invoke(['profile', 'add', 'sample', '--root', str(projects)])
+            self.assertEqual(code, 0)
+            self.assertEqual((homes / 'sample').stat().st_mode & 0o777, 0o700)
+            self.assertEqual((projects / 'sample').stat().st_mode & 0o777, 0o700)
+            cfg = homes / 'sample/.config/agent-harness'
+            self.assertEqual((cfg / 'pool.toml').stat().st_mode & 0o777, 0o600)
+            self.assertIn('profile = "sample"', (cfg / 'guard.toml').read_text())
+            self.assertIn(str(projects / 'sample'), (cfg / 'coordinator.toml').read_text())
+            dropin = base / 'system/user-12345.slice.d/50-agent-harness.conf'
+            self.assertIn('TasksMax=4096', dropin.read_text())
+            self.assertIn('agent-heavy', run.call_args_list[1].args[0])
+            self.assertTrue((base / 'etc/profiles/sample.json').is_file())
+            self.assertIn('DRAFT', (projects / 'sample/NORTH-STAR.md').read_text())
+
     def test_source_symlinks_refused(self):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary)
