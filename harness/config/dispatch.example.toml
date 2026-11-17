@@ -1,0 +1,8 @@
+[dispatch]
+max_workers = 3
+# Optional paths, relative to the job working directory unless absolute.
+# template = "/opt/agent-harness/current/templates/brief.md"
+north_star = "NORTH-STAR.md"
+operating_context = "AGENTS.md"
+state_excerpt = "COORDINATOR-STATE.md"
+stop_rule = "Complete this task, write the handover, and stop. End your final response with ## Summary."
